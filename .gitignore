@@ -1,0 +1,5 @@
+# Pasta da sessão
+session/
+
+# Pasta de dependências
+node_modules/

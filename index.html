@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Meu CRM de WhatsApp</title>
+    <style>body{font-family:sans-serif;background-color:#f0f2f5;margin:0;padding:20px}h1{text-align:center;color:#128C7E}#messages{max-width:800px;margin:20px auto;padding:10px;background-color:#fff;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);height:70vh;overflow-y:scroll}.message{background-color:#e6f8d3;padding:10px 15px;border-radius:10px;margin-bottom:10px;max-width:70%;word-wrap:break-word}.message .from{font-weight:bold;color:#075E54;margin-bottom:5px}</style>
+</head>
+<body>
+    <h1>Mensagens do WhatsApp em Tempo Real</h1>
+    <div id="messages"></div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>const socket=io(),messagesContainer=document.getElementById("messages");socket.on("message",a=>{const e=document.createElement("div");e.classList.add("message");const t=document.createElement("div");t.classList.add("from"),t.innerText=a.from.replace("@c.us","");const s=document.createElement("div");s.innerText=a.body,e.appendChild(t),e.appendChild(s),messagesContainer.appendChild(e),messagesContainer.scrollTop=messagesContainer.scrollHeight});</script>
+</body>
+</html>
