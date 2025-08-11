@@ -1,13 +1,131 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Meu CRM de WhatsApp</title>
-    <style>body{font-family:sans-serif;background-color:#f0f2f5;margin:0;padding:20px}h1{text-align:center;color:#128C7E}#messages{max-width:800px;margin:20px auto;padding:10px;background-color:#fff;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,.1);height:70vh;overflow-y:scroll}.message{background-color:#e6f8d3;padding:10px 15px;border-radius:10px;margin-bottom:10px;max-width:70%;word-wrap:break-word}.message .from{font-weight:bold;color:#075E54;margin-bottom:5px}</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM WhatsApp v2.0</title>
+    <style>
+        :root { --cor-primaria: #075E54; --cor-fundo: #ECE5DD; --cor-conversa: #E5DDD5; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; margin: 0; display: flex; height: 100vh; background-color: #d1d7db; }
+        .sidebar { width: 30%; min-width: 250px; background-color: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 10px 15px; background-color: #f0f2f5; border-bottom: 1px solid #ddd; }
+        #status-cliente { font-weight: bold; text-align: center; padding: 5px; background-color: #ffc107; }
+        .chat-list { flex-grow: 1; overflow-y: auto; }
+        .chat-item { display: flex; align-items: center; padding: 15px; cursor: pointer; border-bottom: 1px solid #f0f2f5; }
+        .chat-item:hover { background-color: #f5f5f5; }
+        .chat-item.active { background-color: #e6e6e6; }
+        .chat-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #ccc; margin-right: 15px; text-align: center; line-height: 40px; font-weight: bold; color: white; }
+        .chat-info .name { font-weight: bold; }
+        .main-chat { flex-grow: 1; display: flex; flex-direction: column; background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); }
+        .messages-window { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column-reverse; }
+        .message-container { display: flex; flex-direction: column; }
+        .message { padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; max-width: 70%; line-height: 1.4; }
+        .message.sent { background-color: #dcf8c6; align-self: flex-end; }
+        .message.received { background-color: #fff; align-self: flex-start; }
+        .reply-form { display: flex; padding: 10px; background-color: #f0f2f5; border-top: 1px solid #ddd; }
+        #message-input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 10px 15px; font-size: 15px; }
+        #send-button { background-color: var(--cor-primaria); color: white; border: none; border-radius: 50%; width: 45px; height: 45px; margin-left: 10px; cursor: pointer; font-size: 20px; }
+    </style>
 </head>
 <body>
-    <h1>Mensagens do WhatsApp em Tempo Real</h1>
-    <div id="messages"></div>
+    <aside class="sidebar">
+        <header class="sidebar-header">
+            <h2>Conversas</h2>
+            <div id="status-cliente">Conectando ao WhatsApp...</div>
+        </header>
+        <div class="chat-list" id="chat-list"></div>
+    </aside>
+
+    <main class="main-chat">
+        <div class="messages-window" id="messages-window">
+            </div>
+        <form class="reply-form" id="reply-form">
+            <input type="text" id="message-input" placeholder="Digite uma mensagem" autocomplete="off">
+            <button type="submit" id="send-button">→</button>
+        </form>
+    </main>
+
     <script src="/socket.io/socket.io.js"></script>
-    <script>const socket=io(),messagesContainer=document.getElementById("messages");socket.on("message",a=>{const e=document.createElement("div");e.classList.add("message");const t=document.createElement("div");t.classList.add("from"),t.innerText=a.from.replace("@c.us","");const s=document.createElement("div");s.innerText=a.body,e.appendChild(t),e.appendChild(s),messagesContainer.appendChild(e),messagesContainer.scrollTop=messagesContainer.scrollHeight});</script>
+    <script>
+        const socket = io();
+        let currentChatId = null;
+
+        const statusDiv = document.getElementById('status-cliente');
+        const chatListDiv = document.getElementById('chat-list');
+        const messagesWindow = document.getElementById('messages-window');
+        const replyForm = document.getElementById('reply-form');
+        const messageInput = document.getElementById('message-input');
+
+        // ---- OUVINTES DO SOCKET ----
+        socket.on('client_ready', () => {
+            statusDiv.textContent = 'WhatsApp Conectado';
+            statusDiv.style.backgroundColor = '#25D366';
+        });
+
+        socket.on('initial_chats', (chats) => {
+            chatListDiv.innerHTML = '';
+            chats.forEach(chat => addChatToList(chat));
+        });
+
+        socket.on('new_message', (message) => {
+            if (message.from === currentChatId) {
+                appendMessage(message.body, 'received');
+            }
+            // Poderíamos adicionar uma notificação no item da lista de chat aqui
+        });
+
+        // ---- FUNÇÕES ----
+        function addChatToList(chat) {
+            const chatItem = document.createElement('div');
+            chatItem.className = 'chat-item';
+            chatItem.dataset.chatId = chat.id;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'chat-avatar';
+            avatar.textContent = chat.name.charAt(0).toUpperCase();
+
+            const info = document.createElement('div');
+            info.className = 'chat-info';
+            info.innerHTML = `<div class="name">${chat.name}</div>`;
+            
+            chatItem.appendChild(avatar);
+            chatItem.appendChild(info);
+
+            chatItem.addEventListener('click', () => selectChat(chat.id, chatItem));
+            chatListDiv.appendChild(chatItem);
+        }
+
+        function selectChat(chatId, element) {
+            currentChatId = chatId;
+            document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            messagesWindow.innerHTML = ''; // Limpa as mensagens da conversa anterior
+            messageInput.focus();
+        }
+
+        function appendMessage(text, type) {
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container';
+
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type}`;
+            messageElement.textContent = text;
+            
+            messageContainer.appendChild(messageElement);
+            // Insere a nova mensagem no topo da janela (pois está invertida com flex-direction)
+            messagesWindow.insertAdjacentElement('afterbegin', messageContainer);
+        }
+
+        // ---- EVENTOS DO FORMULÁRIO ----
+        replyForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (message && currentChatId) {
+                socket.emit('send_message', { number: currentChatId, message: message });
+                appendMessage(message, 'sent'); // Mostra a sua mensagem na tela imediatamente
+                messageInput.value = '';
+            }
+        });
+    </script>
 </body>
 </html>
