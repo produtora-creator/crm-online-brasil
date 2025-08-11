@@ -23,7 +23,7 @@ function App() {
     // Função assíncrona para buscar os dados
     const fetchData = async () => {
       // O nosso "detetive" para depuração
-      const apiUrl = `${import.meta.env.VITE_API_URL}/api/conversations`;
+    const apiUrl = '/api/conversations'; // Simples assim!
       console.log("Estou tentando buscar dados da seguinte URL:", apiUrl);
 
       try {

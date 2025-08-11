@@ -1,32 +1,30 @@
-// src/app.js
 const express = require('express');
-const cors = require('cors');
+const cors = require('cors'); // A declaração deve aparecer apenas UMA VEZ, aqui no topo.
 require('dotenv').config();
 
-// IMPORTAR A NOVA ROTA
 const conversationRoutes = require('./routes/conversationRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
-const cors = require('cors');
-
+// MIDDLEWARE
+// Configuração de CORS mais explícita para permitir a comunicação.
 app.use(cors({
   origin: '*', // Permite acesso de QUALQUER origem
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Permite todos estes métodos HTTP
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
 }));
-
 app.use(express.json());
 
-// Rota de teste principal
+
+// ROTAS
 app.get('/', (req, res) => {
   res.status(200).json({ message: 'API do WhatsApp CRM está no ar!' });
 });
 
-// USAR AS ROTAS DE CONVERSA COM UM PREFIXO /api
 app.use('/api/conversations', conversationRoutes);
 
 
+// INICIAR SERVIDOR
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
