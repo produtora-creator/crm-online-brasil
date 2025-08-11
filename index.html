@@ -3,10 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRM WhatsApp v2.0</title>
+    <title>CRM WhatsApp v3.0</title>
     <style>
         :root { --cor-primaria: #075E54; --cor-fundo: #ECE5DD; --cor-conversa: #E5DDD5; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; margin: 0; display: flex; height: 100vh; background-color: #d1d7db; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; margin: 0; background-color: #d1d7db; }
+        
+        /* --- Tela de QR Code --- */
+        #qrcode-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; flex-direction: column; color: white; transition: opacity 0.5s; }
+        #qrcode-container { background-color: white; padding: 25px; border-radius: 10px; }
+        #qrcode-overlay p { font-size: 1.2rem; margin-top: 20px; }
+
+        /* --- Estrutura Principal do CRM --- */
+        .crm-container { display: flex; height: 100vh; opacity: 0; transition: opacity 0.5s; visibility: hidden; }
         .sidebar { width: 30%; min-width: 250px; background-color: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
         .sidebar-header { padding: 10px 15px; background-color: #f0f2f5; border-bottom: 1px solid #ddd; }
         #status-cliente { font-weight: bold; text-align: center; padding: 5px; background-color: #ffc107; }
@@ -28,36 +36,66 @@
     </style>
 </head>
 <body>
-    <aside class="sidebar">
-        <header class="sidebar-header">
-            <h2>Conversas</h2>
-            <div id="status-cliente">Conectando ao WhatsApp...</div>
-        </header>
-        <div class="chat-list" id="chat-list"></div>
-    </aside>
+    <div id="qrcode-overlay">
+        <div id="qrcode-container">
+            <canvas id="qrcode-canvas"></canvas>
+        </div>
+        <p id="qrcode-instructions">Aponte a câmera do WhatsApp para escanear.</p>
+    </div>
 
-    <main class="main-chat">
-        <div class="messages-window" id="messages-window">
-            </div>
-        <form class="reply-form" id="reply-form">
-            <input type="text" id="message-input" placeholder="Digite uma mensagem" autocomplete="off">
-            <button type="submit" id="send-button">→</button>
-        </form>
-    </main>
+    <div class="crm-container" id="crm-container">
+        <aside class="sidebar">
+            <header class="sidebar-header">
+                <h2>Conversas</h2>
+                <div id="status-cliente">Conectando...</div>
+            </header>
+            <div class="chat-list" id="chat-list"></div>
+        </aside>
+
+        <main class="main-chat">
+            <div class="messages-window" id="messages-window"></div>
+            <form class="reply-form" id="reply-form">
+                <input type="text" id="message-input" placeholder="Digite uma mensagem" autocomplete="off">
+                <button type="submit" id="send-button">→</button>
+            </form>
+        </main>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
     <script>
         const socket = io();
         let currentChatId = null;
 
+        // Elementos da UI
+        const qrcodeOverlay = document.getElementById('qrcode-overlay');
+        const qrcodeCanvas = document.getElementById('qrcode-canvas');
+        const qrcodeInstructions = document.getElementById('qrcode-instructions');
+        const crmContainer = document.getElementById('crm-container');
         const statusDiv = document.getElementById('status-cliente');
         const chatListDiv = document.getElementById('chat-list');
         const messagesWindow = document.getElementById('messages-window');
         const replyForm = document.getElementById('reply-form');
         const messageInput = document.getElementById('message-input');
-
+        
         // ---- OUVINTES DO SOCKET ----
+        socket.on('qr_code', (qr) => {
+            qrcodeInstructions.textContent = 'Aponte a câmera do WhatsApp para escanear.';
+            QRCode.toCanvas(qrcodeCanvas, qr, { width: 250 }, (error) => {
+                if (error) console.error(error);
+                console.log('QR Code renderizado na tela!');
+            });
+        });
+
         socket.on('client_ready', () => {
+            // Esconde a tela de QR Code e mostra o CRM
+            qrcodeOverlay.style.opacity = '0';
+            setTimeout(() => { qrcodeOverlay.style.display = 'none'; }, 500);
+
+            crmContainer.style.visibility = 'visible';
+            crmContainer.style.opacity = '1';
+
             statusDiv.textContent = 'WhatsApp Conectado';
             statusDiv.style.backgroundColor = '#25D366';
         });
@@ -71,7 +109,6 @@
             if (message.from === currentChatId) {
                 appendMessage(message.body, 'received');
             }
-            // Poderíamos adicionar uma notificação no item da lista de chat aqui
         });
 
         // ---- FUNÇÕES ----
@@ -82,11 +119,11 @@
 
             const avatar = document.createElement('div');
             avatar.className = 'chat-avatar';
-            avatar.textContent = chat.name.charAt(0).toUpperCase();
+            avatar.textContent = chat.name ? chat.name.charAt(0).toUpperCase() : '#';
 
             const info = document.createElement('div');
             info.className = 'chat-info';
-            info.innerHTML = `<div class="name">${chat.name}</div>`;
+            info.innerHTML = `<div class="name">${chat.name || chat.id}</div>`;
             
             chatItem.appendChild(avatar);
             chatItem.appendChild(info);
@@ -99,20 +136,17 @@
             currentChatId = chatId;
             document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
             element.classList.add('active');
-            messagesWindow.innerHTML = ''; // Limpa as mensagens da conversa anterior
+            messagesWindow.innerHTML = '';
             messageInput.focus();
         }
 
         function appendMessage(text, type) {
             const messageContainer = document.createElement('div');
             messageContainer.className = 'message-container';
-
             const messageElement = document.createElement('div');
             messageElement.className = `message ${type}`;
             messageElement.textContent = text;
-            
             messageContainer.appendChild(messageElement);
-            // Insere a nova mensagem no topo da janela (pois está invertida com flex-direction)
             messagesWindow.insertAdjacentElement('afterbegin', messageContainer);
         }
 
@@ -122,10 +156,13 @@
             const message = messageInput.value.trim();
             if (message && currentChatId) {
                 socket.emit('send_message', { number: currentChatId, message: message });
-                appendMessage(message, 'sent'); // Mostra a sua mensagem na tela imediatamente
+                appendMessage(message, 'sent');
                 messageInput.value = '';
             }
         });
+
+        // Estado inicial
+        qrcodeInstructions.textContent = 'Aguardando QR Code do servidor...';
     </script>
 </body>
 </html>
